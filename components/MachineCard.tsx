@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Machine, MachineStatus, MachineType } from '../types';
 
@@ -40,13 +39,11 @@ const MachineCard: React.FC<MachineCardProps> = ({ machine, onBook, customIcon, 
   };
 
   const config = getStatusConfig();
-  // Strictly green for available (#10b981), red for others (#ef4444)
   const iconBgColor = isAvailable ? 'bg-[#10b981]' : 'bg-[#ef4444]';
 
   return (
     <div className={`group relative bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm hover:shadow-2xl transition-all duration-500 ${isMaintenance ? 'opacity-70 grayscale' : ''}`}>
       <div className="flex justify-between items-center mb-8">
-        {/* Machine Image Slot - Fixed Sizing for Alignment */}
         <label className={`w-24 h-24 rounded-[32px] flex items-center justify-center overflow-hidden cursor-pointer relative shadow-lg transition-all active:scale-95 ${iconBgColor} text-white border-4 border-white`}>
           <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
           {customIcon ? (
@@ -61,7 +58,6 @@ const MachineCard: React.FC<MachineCardProps> = ({ machine, onBook, customIcon, 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           )}
-          {/* Action indicator */}
           <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
              <div className="bg-white/40 backdrop-blur-md p-3 rounded-full border border-white/50">
                 <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>

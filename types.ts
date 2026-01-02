@@ -1,4 +1,3 @@
-
 export enum MachineStatus {
   AVAILABLE = 'AVAILABLE',
   BUSY = 'BUSY',

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Machine, MachineStatus, MachineType } from './types';
 import { INITIAL_MACHINES } from './constants';
@@ -14,69 +13,90 @@ interface ActiveBooking {
   durationMinutes: number;
 }
 
+// Default Assets (Base64)
+const DEFAULT_LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23114FFF'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z'/%3E%3C/svg%3E";
+const DEFAULT_WASHER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23114FFF'%3E%3Cpath d='M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-6 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM8 5c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z'/%3E%3C/svg%3E";
+const DEFAULT_DRYER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FF6D33'%3E%3Cpath d='M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-6 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm3.5-6c0 1.93-1.57 3.5-3.5 3.5S8.5 13.93 8.5 12 10.07 8.5 12 8.5s3.5 1.57 3.5 3.5zM7 5c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z'/%3E%3C/svg%3E";
+const DEFAULT_GUIDE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2364748B'%3E%3Cpath d='M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM9 4h2v5l-1-.75L9 9V4zm9 16H6V4h1v9l3-2.25L13 13V4h5v16z'/%3E%3C/svg%3E";
+
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('HOME');
   const [activeType, setActiveType] = useState<MachineType>(MachineType.WASHER);
-  const [machines] = useState<Machine[]>(INITIAL_MACHINES);
+  
+  // Track machines in state for real-time status updates
+  const [machines, setMachines] = useState<Machine[]>(() => {
+    const saved = localStorage.getItem('machines_state');
+    return saved ? JSON.parse(saved) : INITIAL_MACHINES;
+  });
+
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  
   const [activeBooking, setActiveBooking] = useState<ActiveBooking | null>(() => {
     const saved = localStorage.getItem('activeBooking');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const now = Date.now();
+      const endTime = parsed.startTime + (parsed.durationMinutes * 60 * 1000);
+      if (endTime > now) return parsed;
+      localStorage.removeItem('activeBooking');
+    }
+    return null;
   });
+  
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
-  // Persistence
+  // Persistence for icons and UI assets
   const [machineIcons, setMachineIcons] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem('machineIconsMap');
     return saved ? JSON.parse(saved) : {};
   });
-  const [washerAvailIcon, setWasherAvailIcon] = useState<string | null>(localStorage.getItem('washerAvailIcon'));
-  const [washerUnavailIcon, setWasherUnavailIcon] = useState<string | null>(localStorage.getItem('washerUnavailIcon'));
-  const [dryerAvailIcon, setDryerAvailIcon] = useState<string | null>(localStorage.getItem('dryerAvailIcon'));
-  const [dryerUnavailIcon, setDryerUnavailIcon] = useState<string | null>(localStorage.getItem('dryerUnavailIcon'));
-  const [appLogo, setAppLogo] = useState<string | null>(localStorage.getItem('appLogo'));
-  const [washerImg, setWasherImg] = useState<string | null>(localStorage.getItem('washerImg'));
-  const [dryerImg, setDryerImg] = useState<string | null>(localStorage.getItem('dryerImg'));
-  const [guideImg, setGuideImg] = useState<string | null>(localStorage.getItem('guideImg'));
+  const [washerAvailIcon, setWasherAvailIcon] = useState<string | null>(() => localStorage.getItem('washerAvailIcon') || DEFAULT_WASHER);
+  const [washerUnavailIcon, setWasherUnavailIcon] = useState<string | null>(() => localStorage.getItem('washerUnavailIcon') || DEFAULT_WASHER);
+  const [dryerAvailIcon, setDryerAvailIcon] = useState<string | null>(() => localStorage.getItem('dryerAvailIcon') || DEFAULT_DRYER);
+  const [dryerUnavailIcon, setDryerUnavailIcon] = useState<string | null>(() => localStorage.getItem('dryerUnavailIcon') || DEFAULT_DRYER);
+  const [appLogo, setAppLogo] = useState<string | null>(() => localStorage.getItem('appLogo') || DEFAULT_LOGO);
+  const [washerImg, setWasherImg] = useState<string | null>(() => localStorage.getItem('washerImg') || DEFAULT_WASHER);
+  const [dryerImg, setDryerImg] = useState<string | null>(() => localStorage.getItem('dryerImg') || DEFAULT_DRYER);
+  const [guideImg, setGuideImg] = useState<string | null>(() => localStorage.getItem('guideImg') || DEFAULT_GUIDE);
 
-  // Guide Images
-  const [tokenImages, setTokenImages] = useState<(string | null)[]>(() => {
-    const saved = localStorage.getItem('tokenImages');
-    return saved ? JSON.parse(saved) : [null, null];
-  });
-  const [washerGuideImages, setWasherGuideImages] = useState<(string | null)[]>(() => {
-    const saved = localStorage.getItem('washerGuideImages');
-    return saved ? JSON.parse(saved) : [null, null, null, null];
-  });
-  const [dryerGuideImages, setDryerGuideImages] = useState<(string | null)[]>(() => {
-    const saved = localStorage.getItem('dryerGuideImages');
-    return saved ? JSON.parse(saved) : [null, null, null];
-  });
-
-  // Timer logic
+  // Sync machines to storage whenever they change
   useEffect(() => {
-    let interval: number | null = null;
-    if (activeBooking) {
-      const updateTimer = () => {
-        const now = Date.now();
-        const endTime = activeBooking.startTime + (activeBooking.durationMinutes * 60 * 1000);
-        const diffMs = endTime - now;
-        
-        if (diffMs <= 0) {
-          setTimeLeft(0);
-          setActiveBooking(null);
-          localStorage.removeItem('activeBooking');
-          setCurrentPage('THANK_YOU');
-          if (interval) clearInterval(interval);
-        } else {
-          setTimeLeft(Math.floor(diffMs / 1000));
-        }
-      };
+    localStorage.setItem('machines_state', JSON.stringify(machines));
+  }, [machines]);
+
+  // Timer and machine status synchronization
+  useEffect(() => {
+    if (!activeBooking) return;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const endTime = activeBooking.startTime + (activeBooking.durationMinutes * 60 * 1000);
+      const diffMs = endTime - now;
       
-      updateTimer();
-      interval = window.setInterval(updateTimer, 1000);
-    }
-    return () => { if (interval) clearInterval(interval); };
+      if (diffMs <= 0) {
+        setTimeLeft(0);
+        
+        // REVERT MACHINE TO AVAILABLE
+        setMachines(prev => prev.map(m => 
+          m.id === activeBooking.machineId ? { ...m, status: MachineStatus.AVAILABLE, remainingMinutes: undefined } : m
+        ));
+        
+        setActiveBooking(null);
+        localStorage.removeItem('activeBooking');
+        setCurrentPage('THANK_YOU');
+      } else {
+        const remainingSeconds = Math.floor(diffMs / 1000);
+        setTimeLeft(remainingSeconds);
+        
+        setMachines(prev => prev.map(m => 
+          m.id === activeBooking.machineId ? { ...m, remainingMinutes: Math.ceil(remainingSeconds / 60) } : m
+        ));
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
   }, [activeBooking]);
 
   const formatTime = (seconds: number) => {
@@ -104,29 +124,15 @@ const App: React.FC = () => {
     localStorage.setItem('machineIconsMap', JSON.stringify(updated));
   };
 
-  const handleGuideImageUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number, type: 'token' | 'washer' | 'dryer') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        if (type === 'token') {
-          const newList = [...tokenImages]; newList[index] = base64;
-          setTokenImages(newList); localStorage.setItem('tokenImages', JSON.stringify(newList));
-        } else if (type === 'washer') {
-          const newList = [...washerGuideImages]; newList[index] = base64;
-          setWasherGuideImages(newList); localStorage.setItem('washerGuideImages', JSON.stringify(newList));
-        } else if (type === 'dryer') {
-          const newList = [...dryerGuideImages]; newList[index] = base64;
-          setDryerGuideImages(newList); localStorage.setItem('dryerGuideImages', JSON.stringify(newList));
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const confirmBooking = () => {
     if (!selectedMachine) return;
+    
+    // UPDATE MACHINE STATUS TO BUSY (IN USE)
+    setMachines(prev => prev.map(m => 
+      m.id === selectedMachine.id ? { ...m, status: MachineStatus.BUSY } : m
+    ));
+
+    // Durations: 35 minutes for Washer, 45 minutes for Dryer
     const duration = selectedMachine.type === MachineType.WASHER ? 35 : 45;
     const newBooking = {
       machineId: selectedMachine.id,
@@ -135,12 +141,12 @@ const App: React.FC = () => {
       startTime: Date.now(),
       durationMinutes: duration
     };
+    
     setActiveBooking(newBooking);
     localStorage.setItem('activeBooking', JSON.stringify(newBooking));
     setCurrentPage('SUCCESS');
   };
 
-  // Fixed Navigation Header (Inside the app container)
   const NavigationHeader = ({ onBack }: { onBack?: () => void }) => (
     <div className="absolute top-0 left-0 right-0 h-24 flex items-center justify-between px-6 z-[200] pointer-events-none">
       <div className="flex items-center pointer-events-auto">
@@ -172,19 +178,12 @@ const App: React.FC = () => {
         <div className="flex flex-col items-center mb-16 space-y-8">
           <label className="cursor-pointer relative group">
             <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, setAppLogo, 'appLogo')} />
-            {appLogo ? (
-              <div className="relative">
-                <img src={appLogo} alt="Logo" className="w-28 h-28 object-contain rounded-[40px] shadow-2xl border-4 border-white transition group-hover:scale-105" />
-                <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-                </div>
+            <div className="relative">
+              <img src={appLogo || DEFAULT_LOGO} alt="Logo" className="w-28 h-28 object-contain rounded-[40px] shadow-2xl border-4 border-white transition group-hover:scale-105" />
+              <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
               </div>
-            ) : (
-              <div className="w-28 h-28 bg-white/70 backdrop-blur-md border-2 border-dashed border-blue-200 rounded-[40px] flex flex-col items-center justify-center text-blue-300 group-hover:border-blue-400 group-hover:text-blue-400 transition-all">
-                <svg className="w-7 h-7 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                <span className="text-[10px] font-black uppercase tracking-widest">Logo</span>
-              </div>
-            )}
+            </div>
           </label>
           <div className="text-center space-y-1">
             <h1 className="text-3xl font-black text-slate-800 tracking-tight">Cempaka Laundry</h1>
@@ -194,9 +193,9 @@ const App: React.FC = () => {
 
         <div className="flex flex-col space-y-6">
           {[
-            { label: 'WASHER', sub: 'HYGIENIC CLEAN', type: MachineType.WASHER, img: washerImg, setter: setWasherImg, key: 'washerImg' },
-            { label: 'DRYER', sub: 'RAPID DRY', type: MachineType.DRYER, img: dryerImg, setter: setDryerImg, key: 'dryerImg' },
-            { label: 'GUIDE', sub: 'STEP BY STEP', page: 'USER_GUIDE' as Page, img: guideImg, setter: setGuideImg, key: 'guideImg' }
+            { label: 'WASHER', sub: 'HYGIENIC CLEAN', type: MachineType.WASHER, img: washerImg || DEFAULT_WASHER, setter: setWasherImg, key: 'washerImg' },
+            { label: 'DRYER', sub: 'RAPID DRY', type: MachineType.DRYER, img: dryerImg || DEFAULT_DRYER, setter: setDryerImg, key: 'dryerImg' },
+            { label: 'GUIDE', sub: 'STEP BY STEP', page: 'USER_GUIDE' as Page, img: guideImg || DEFAULT_GUIDE, setter: setGuideImg, key: 'guideImg' }
           ].map((item, idx) => (
             <div key={idx} className="relative group">
               <div className="bg-white rounded-[38px] p-7 shadow-xl shadow-blue-900/5 border border-white/80 flex items-center justify-between min-h-[150px] transition-all duration-300 group-hover:bg-blue-50/20 group-hover:border-blue-100">
@@ -214,13 +213,7 @@ const App: React.FC = () => {
                 </div>
                 <label className="cursor-pointer relative z-10 w-24 h-24 ml-4 shrink-0">
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, item.setter, item.key)} />
-                  {item.img ? (
-                    <img src={item.img} className="w-full h-full object-cover rounded-[28px] shadow-sm border-2 border-white transition group-hover:scale-105" alt={item.label} />
-                  ) : (
-                    <div className="w-full h-full bg-blue-50 rounded-[28px] flex flex-col items-center justify-center text-blue-200 border-2 border-dashed border-blue-100">
-                      <span className="text-[8px] font-bold uppercase tracking-widest">PHOTO</span>
-                    </div>
-                  )}
+                  <img src={item.img!} className="w-full h-full object-cover rounded-[28px] shadow-sm border-2 border-white transition group-hover:scale-105" alt={item.label} />
                 </label>
               </div>
             </div>
@@ -243,241 +236,199 @@ const App: React.FC = () => {
         )}
 
         <footer className="mt-20 text-center pb-8 opacity-20">
-          <p className="text-blue-500 font-black text-[8px] uppercase tracking-[0.6em]">CEMPAKA TECH v1.7</p>
+          <p className="text-blue-500 font-black text-[8px] uppercase tracking-[0.6em]">CEMPAKA TECH v2.0</p>
         </footer>
       </div>
     </div>
   );
 
-  const renderAvailability = () => {
-    const statusAvail = activeType === MachineType.WASHER ? washerAvailIcon : dryerAvailIcon;
-    const statusUnavail = activeType === MachineType.WASHER ? washerUnavailIcon : dryerUnavailIcon;
+  const renderTimerView = () => {
+    const totalSeconds = (activeBooking?.durationMinutes || 1) * 60;
+    const progressPercent = ((totalSeconds - timeLeft) / totalSeconds) * 100;
+    const strokeDasharray = 2 * Math.PI * 90;
+    const strokeDashoffset = strokeDasharray - (strokeDasharray * progressPercent) / 100;
 
     return (
       <div className="flex flex-col h-full bg-[#FBFDFF] relative overflow-hidden">
         <NavigationHeader onBack={() => setCurrentPage('HOME')} />
-        
-        <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32 scrollbar-hide animate-in fade-in duration-500">
-          <div className="flex flex-col space-y-6 mb-8 mt-2">
-            <h1 className="text-3xl font-black text-slate-800 leading-tight">
-              Pick your <br/>
-              <span className="text-blue-500">{activeType}</span>
-            </h1>
-            
-            <div className="flex items-center space-x-4">
-              {[
-                { label: 'READY', color: 'emerald', icon: statusAvail, key: activeType === MachineType.WASHER ? 'washerAvailIcon' : 'dryerAvailIcon', setter: activeType === MachineType.WASHER ? setWasherAvailIcon : setDryerAvailIcon },
-                { label: 'BUSY', color: 'rose', icon: statusUnavail, key: activeType === MachineType.WASHER ? 'washerUnavailIcon' : 'dryerUnavailIcon', setter: activeType === MachineType.WASHER ? setWasherUnavailIcon : setDryerUnavailIcon }
-              ].map((btn, i) => (
-                <div key={i} className="flex flex-col items-center space-y-1.5">
-                  <label className="cursor-pointer group relative w-14 h-14">
-                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, btn.setter, btn.key)} />
-                    <div className="w-full h-full bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-blue-100 shadow-sm group-hover:border-blue-300 transition-all">
-                      {btn.icon ? (
-                        <img src={btn.icon} className="w-full h-full object-cover" alt="icon" />
-                      ) : (
-                        <div className={`w-2.5 h-2.5 rounded-full bg-${btn.color}-500`}></div>
-                      )}
-                    </div>
-                  </label>
-                  <span className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em]">{btn.label}</span>
-                </div>
-              ))}
+        <div className="flex-1 overflow-y-auto px-8 pt-24 pb-20 flex flex-col items-center justify-center space-y-16 animate-in fade-in duration-700">
+          <div className="text-center flex flex-col items-center justify-center scale-110">
+            <div className="relative w-64 h-64 flex items-center justify-center">
+               <div className="absolute inset-0 bg-blue-100/20 blur-[100px] rounded-full scale-150 animate-pulse"></div>
+               <svg className="absolute w-full h-full -rotate-90 drop-shadow-2xl" viewBox="0 0 200 200">
+                 <circle cx="100" cy="100" r="90" stroke="rgba(59, 130, 246, 0.1)" strokeWidth="12" fill="none" />
+                 <circle cx="100" cy="100" r="90" stroke="#3b82f6" strokeWidth="12" fill="none" strokeLinecap="round"
+                    style={{ strokeDasharray, strokeDashoffset, transition: 'stroke-dashoffset 1s linear' }} />
+               </svg>
+               <div className="relative z-10 flex flex-col items-center justify-center bg-white w-48 h-48 rounded-full shadow-inner border-[10px] border-[#F8FAFF]">
+                  <span className="text-5xl font-black tracking-tighter text-slate-800 tabular-nums leading-none">{formatTime(timeLeft)}</span>
+                  <p className="text-blue-400 font-black tracking-[0.4em] text-[9px] mt-4 uppercase opacity-80">TIME LEFT</p>
+               </div>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 gap-6">
-            {machines.filter(m => m.type === activeType).map(machine => {
-              const machinePhoto = machineIcons[machine.id] || (machine.status === MachineStatus.AVAILABLE ? statusAvail : statusUnavail);
-              return (
-                <MachineCard 
-                  key={machine.id} 
-                  machine={machine} 
-                  customIcon={machinePhoto}
-                  onIconUpload={handleMachineIconUpload}
-                  onBook={(m) => { setSelectedMachine(m); setCurrentPage('CONFIRM_BOOKING'); }} 
-                />
-              );
-            })}
+          <div className="text-center space-y-6 w-full max-w-[280px]">
+            <div className="space-y-2">
+              <p className="text-[10px] font-black text-blue-300 uppercase tracking-[0.4em]">ACTIVE SESSION</p>
+              <h3 className="text-3xl font-black text-slate-800 tracking-tight">{activeBooking?.machineName}</h3>
+            </div>
+            <div className="flex items-center justify-center space-x-3 px-6 py-4 bg-blue-50/50 rounded-3xl border border-blue-100/30">
+              <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-ping"></div>
+              <p className="text-blue-500 font-black tracking-[0.25em] text-[9px] uppercase">Processing Cycle</p>
+            </div>
           </div>
+          <button onClick={() => setCurrentPage('HOME')} className="w-full py-5 bg-white rounded-[28px] border border-blue-100 text-blue-500 font-black text-[11px] tracking-widest uppercase shadow-sm">MINIMIZE</button>
         </div>
       </div>
     );
   };
 
-  const renderConfirm = () => (
-    <div className="flex flex-col h-full bg-white relative overflow-hidden">
-      <NavigationHeader onBack={() => setCurrentPage('AVAILABILITY')} />
-      
-      <div className="flex-1 overflow-y-auto px-8 pt-24 pb-20 flex flex-col justify-center animate-in zoom-in-95 duration-500">
-        <div className="bg-blue-50/30 rounded-[45px] p-10 border border-blue-50/50 space-y-8 text-center">
-            <div className={`mx-auto w-28 h-28 rounded-[32px] flex items-center justify-center shadow-lg overflow-hidden border-4 border-white bg-white text-blue-500`}>
-              {(machineIcons[selectedMachine?.id || ''] || (selectedMachine?.status === MachineStatus.AVAILABLE ? (selectedMachine?.type === MachineType.WASHER ? washerAvailIcon : dryerAvailIcon) : (selectedMachine?.type === MachineType.WASHER ? washerUnavailIcon : dryerUnavailIcon))) ? (
-                <img src={machineIcons[selectedMachine?.id || ''] || (selectedMachine?.status === MachineStatus.AVAILABLE ? (selectedMachine?.type === MachineType.WASHER ? washerAvailIcon : dryerAvailIcon) : (selectedMachine?.type === MachineType.WASHER ? washerUnavailIcon : dryerUnavailIcon))!} className="w-full h-full object-cover" alt="selected" />
-              ) : (
-                <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              )}
-            </div>
-            
-            <div className="space-y-1">
-              <h2 className="text-2xl font-black text-slate-800">Confirm Cycle</h2>
-              <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.3em]">Cempaka Premium Service</p>
-            </div>
+  const renderUserGuide = () => {
+    const guideSections = [
+      {
+        title: 'Tokens & Payment',
+        steps: [
+          { header: '', text: 'Put your money in the green colour money insert place to get the laundry token' },
+          { header: '', text: 'Collect your token below it' }
+        ]
+      },
+      {
+        title: 'Washer Operations',
+        steps: [
+          { header: '1. Load Clothes', text: 'Place your clothes into the washer. Do not overload the machine to ensure proper washing.' },
+          { header: '2. Add Detergent & Softener', text: 'Open the drawer on the right side of the washer.\n• Left section: Detergent\n• Right section: Softener compartment (optional)' },
+          { header: '3. Insert Tokens', text: 'Check the token slot label:\n• Blue - Washer\nInsert 5 tokens into the machine you want to use.\n(Each token is RM1.)' },
+          { header: '4. Select Wash Cycle', text: 'Press one of the wash setting buttons (the white buttons with water level/temperature icons)' },
+          { header: '5. Start the Machine', text: 'Press the green button to start the washing cycle.' }
+        ]
+      },
+      {
+        title: 'Dryer Operations',
+        steps: [
+          { header: '1. Load Clothes', text: 'Place your clothes into the dryer. Balance out heavier and lighter ones to ensure all dry evenly.' },
+          { header: '2. Insert Tokens', text: 'Check the token slot label:\n• Red = Dryer\nInsert 5 tokens into the machine you want to use.\n(Each token is RM1.)' },
+          { header: '3. Select the proper dryer setting', text: '• High heat: best for durable fabrics\n• Medium heat: Ideal for synthetic fabrics\n• Low heat: Suitable for dedicate item\n• No heat: Uses room-temperature air' },
+          { header: '4. Start the Machine', text: 'Press the green button to start the dryer cycle.' }
+        ]
+      }
+    ];
 
-          <div className="space-y-5 px-2">
-            {[
-              { label: 'DEVICE', val: selectedMachine?.name },
-              { label: 'EST. TIME', val: `${selectedMachine?.type === MachineType.WASHER ? '35' : '45'} MIN`, color: 'text-blue-500' }
-            ].map((row, i) => (
-              <div key={i} className="flex justify-between items-center border-b border-blue-100/50 pb-3.5">
-                <span className="text-blue-300 font-black uppercase text-[8px] tracking-widest">{row.label}</span>
-                <span className={`text-base font-black text-slate-700 ${row.color || ''}`}>{row.val}</span>
-              </div>
+    return (
+      <div className="flex flex-col h-full bg-white relative overflow-hidden">
+        <NavigationHeader onBack={() => setCurrentPage('HOME')} />
+        <div className="flex-1 overflow-y-auto px-6 pt-24 pb-24 scrollbar-hide animate-in slide-in-from-right duration-700">
+          <div className="flex flex-col items-center mb-10 text-center">
+            <img src={appLogo || DEFAULT_LOGO} className="w-16 h-16 object-contain mb-4 rounded-3xl" alt="logo" />
+            <h1 className="text-3xl font-black text-slate-800 leading-tight">Step-by-Step<br/>Manual</h1>
+          </div>
+          <div className="space-y-16">
+            {guideSections.map((sec, sIdx) => (
+              <section key={sIdx} className="space-y-8">
+                <div className="flex items-center space-x-4">
+                  <h3 className="text-lg font-black text-blue-500 tracking-tight shrink-0 uppercase">{sec.title}</h3>
+                  <div className="h-px flex-1 bg-blue-100 rounded-full"></div>
+                </div>
+                <div className="space-y-8">
+                  {sec.steps.map((step, i) => (
+                    <div key={i} className="flex items-start space-x-5">
+                       <div className="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-lg shadow-blue-100">{i + 1}</div>
+                       <div className="pt-1 flex-1">
+                          {step.header && <p className="text-sm font-black text-slate-800 mb-1">{step.header}</p>}
+                          <p className="text-sm font-bold text-slate-600 leading-relaxed tracking-tight whitespace-pre-line">{step.text}</p>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
-
-          <button 
-            onClick={confirmBooking}
-            className="w-full py-6 bg-blue-500 text-white rounded-[28px] font-black text-base tracking-widest shadow-xl shadow-blue-200/50 active:scale-95 transition-all"
-          >
-            START NOW
-          </button>
+          <footer className="mt-20 pt-10 border-t border-slate-50 text-center text-blue-300 font-black text-[9px] uppercase tracking-[0.4em]">Cempaka Premium Quality Guaranteed</footer>
         </div>
       </div>
-    </div>
-  );
-
-  const renderTimerView = () => (
-    <div className="flex flex-col h-full bg-[#FBFDFF] relative overflow-hidden">
-      <NavigationHeader onBack={() => setCurrentPage('HOME')} />
-      
-      <div className="flex-1 overflow-y-auto px-8 pt-24 pb-20 flex flex-col items-center justify-center space-y-16 animate-in fade-in duration-700">
-        
-        {/* Simplified Digital Timer Display */}
-        <div className="text-center flex flex-col items-center justify-center">
-          <div className="relative">
-             {/* Soft background pulse */}
-             <div className="absolute inset-0 bg-blue-100/30 blur-3xl rounded-full scale-150 animate-pulse"></div>
-             <div className="relative flex flex-col items-center justify-center bg-white w-56 h-56 rounded-full shadow-2xl border-4 border-white shadow-blue-100">
-                <span className="text-6xl font-black tracking-tighter text-slate-800 tabular-nums leading-none">
-                  {formatTime(timeLeft)}
-                </span>
-                <p className="text-blue-400 font-black tracking-[0.5em] text-[10px] mt-4 uppercase opacity-80">MIN REMAINING</p>
-             </div>
-          </div>
-        </div>
-        
-        <div className="text-center space-y-6 w-full max-w-[280px]">
-          <div className="space-y-2">
-            <p className="text-[10px] font-black text-blue-300 uppercase tracking-[0.4em]">ACTIVE SESSION</p>
-            <h3 className="text-3xl font-black text-slate-800 tracking-tight">{activeBooking?.machineName}</h3>
-          </div>
-          
-          <div className="flex items-center justify-center space-x-3 px-6 py-3 bg-blue-50/50 rounded-2xl border border-blue-100/30">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
-            <p className="text-blue-500 font-black tracking-[0.3em] text-[9px] uppercase">OPERATING NORMALLY</p>
-          </div>
-        </div>
-
-        <button 
-          onClick={() => setCurrentPage('HOME')}
-          className="w-full py-5 bg-white rounded-[28px] border border-blue-100 text-blue-500 font-black text-[10px] tracking-widest uppercase shadow-sm hover:bg-blue-50/50 transition-all active:scale-95 duration-200"
-        >
-          GO BACK
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderSuccess = () => (
-    <div className="flex flex-col h-full bg-white relative overflow-hidden items-center justify-center p-10 text-center">
-      <div className="w-28 h-28 bg-emerald-50 rounded-full flex items-center justify-center mb-10 shadow-inner border-4 border-white">
-        <svg className="w-14 h-14 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
-      </div>
-      <h2 className="text-3xl font-black text-slate-800 mb-3">Cycle Locked!</h2>
-      <p className="text-blue-400 font-black text-[10px] mb-12 uppercase tracking-[0.25em] leading-relaxed">Everything is set.<br/>We'll keep track of the time.</p>
-      <button 
-        onClick={() => setCurrentPage('TIMER_VIEW')} 
-        className="w-full py-6 bg-blue-500 text-white rounded-[28px] font-black tracking-widest text-sm shadow-xl shadow-blue-200/50 active:scale-95"
-      >
-        TRACK LIVE
-      </button>
-    </div>
-  );
-
-  const renderThankYou = () => (
-    <div className="flex flex-col h-full bg-blue-500 items-center justify-center p-12 text-center text-white">
-      <div className="w-28 h-28 bg-white/20 rounded-full flex items-center justify-center mb-8 backdrop-blur-md">
-        <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
-      </div>
-      <h2 className="text-4xl font-black mb-5 tracking-tight">Complete!</h2>
-      <p className="text-blue-100 font-black text-[10px] mb-14 uppercase tracking-[0.4em] leading-loose">Your laundry is fresh & ready.<br/>Collect within 15 mins.</p>
-      <button 
-        onClick={() => setCurrentPage('HOME')} 
-        className="w-full py-6 bg-white text-blue-500 rounded-[30px] font-black text-base tracking-widest shadow-2xl active:scale-95 transition-all"
-      >
-        DASHBOARD
-      </button>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="max-w-md mx-auto h-full bg-white shadow-2xl overflow-hidden relative border-x border-slate-100 flex flex-col scrollbar-hide">
       {currentPage === 'HOME' && renderHome()}
-      {currentPage === 'AVAILABILITY' && renderAvailability()}
-      {currentPage === 'CONFIRM_BOOKING' && renderConfirm()}
-      {currentPage === 'SUCCESS' && renderSuccess()}
-      {currentPage === 'TIMER_VIEW' && renderTimerView()}
-      {currentPage === 'THANK_YOU' && renderThankYou()}
-      {currentPage === 'USER_GUIDE' && (
-        <div className="flex flex-col h-full bg-white relative overflow-hidden">
+      {currentPage === 'AVAILABILITY' && (
+        <div className="flex flex-col h-full bg-[#FBFDFF] relative overflow-hidden">
           <NavigationHeader onBack={() => setCurrentPage('HOME')} />
-          <div className="flex-1 overflow-y-auto px-6 pt-24 pb-24 scrollbar-hide animate-in slide-in-from-right duration-700">
-            <h1 className="text-3xl font-black text-slate-800 mb-12 mt-4 leading-tight">Step-by-Step<br/>Manual</h1>
-            
-            <div className="space-y-16">
-              {[
-                { title: 'Tokens & Payment', images: tokenImages, type: 'token' },
-                { title: 'Washer Operations', images: washerGuideImages, type: 'washer' },
-                { title: 'Dryer Operations', images: dryerGuideImages, type: 'dryer' }
-              ].map((sec, idx) => (
-                <section key={idx} className="space-y-10">
-                  <div className="flex items-center space-x-4">
-                    <h3 className="text-xl font-black text-blue-500 tracking-tight shrink-0">{sec.title}</h3>
-                    <div className="h-0.5 flex-1 bg-blue-50 rounded-full"></div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 gap-12">
-                    {sec.images.map((src, i) => (
-                      <div key={i} className="flex flex-col space-y-6">
-                        <label className="cursor-pointer group relative block w-full overflow-hidden rounded-[40px] shadow-2xl border-4 border-white transition-all hover:translate-y-[-4px]">
-                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleGuideImageUpload(e, i, sec.type as any)} />
-                          {src ? (
-                            <img src={src} className="w-full h-auto block object-contain bg-slate-50" alt="Manual Step" />
-                          ) : (
-                            <div className="w-full aspect-video bg-blue-50/50 border-2 border-dashed border-blue-200 rounded-[32px] flex flex-col items-center justify-center text-blue-200 p-10 text-center">
-                              <div className="bg-white p-4 rounded-full shadow-md mb-4 group-hover:scale-110 transition-transform">
-                                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
-                              </div>
-                              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Upload Guide Image</span>
-                              <p className="text-[8px] font-bold mt-2 opacity-60">Large high-quality photos recommended</p>
-                            </div>
-                          )}
-                        </label>
-                        
-                        <div className="flex flex-col items-center space-y-2">
-                           <div className="w-10 h-1 bg-blue-500/10 rounded-full"></div>
-                           <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.4em] text-center">STEP {i+1} OF {sec.images.length}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+          <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32 scrollbar-hide animate-in fade-in duration-500">
+            <div className="flex flex-col space-y-6 mb-8 mt-2">
+              <h1 className="text-3xl font-black text-slate-800 leading-tight">Pick your <br/><span className="text-blue-500">{activeType}</span></h1>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-[#10b981] rounded-full"></div>
+                  <span className="text-[10px] font-black text-[#10b981] uppercase tracking-widest">Available</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-[#ef4444] rounded-full"></div>
+                  <span className="text-[10px] font-black text-[#ef4444] uppercase tracking-widest">In Use</span>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-6">
+              {machines.filter(m => m.type === activeType).map(machine => (
+                <MachineCard 
+                  key={machine.id} 
+                  machine={machine} 
+                  customIcon={machineIcons[machine.id] || (machine.status === MachineStatus.AVAILABLE ? (activeType === MachineType.WASHER ? washerAvailIcon : dryerAvailIcon) : (activeType === MachineType.WASHER ? washerUnavailIcon : dryerUnavailIcon))}
+                  onIconUpload={handleMachineIconUpload}
+                  onBook={(m) => { setSelectedMachine(m); setCurrentPage('CONFIRM_BOOKING'); }} 
+                />
               ))}
             </div>
           </div>
         </div>
       )}
+      {currentPage === 'CONFIRM_BOOKING' && (
+        <div className="flex flex-col h-full bg-white relative overflow-hidden">
+          <NavigationHeader onBack={() => setCurrentPage('AVAILABILITY')} />
+          <div className="flex-1 overflow-y-auto px-8 pt-24 pb-20 flex flex-col justify-center animate-in zoom-in-95 duration-500">
+            <div className="bg-blue-50/30 rounded-[45px] p-10 border border-blue-50/50 space-y-8 text-center">
+                <div className="mx-auto w-28 h-28 rounded-[32px] flex items-center justify-center shadow-lg overflow-hidden border-4 border-white bg-white">
+                  <img src={machineIcons[selectedMachine?.id || ''] || (selectedMachine?.status === MachineStatus.AVAILABLE ? (selectedMachine?.type === MachineType.WASHER ? washerAvailIcon : dryerAvailIcon) : (selectedMachine?.type === MachineType.WASHER ? washerUnavailIcon : dryerUnavailIcon)) || DEFAULT_WASHER} className="w-full h-full object-cover" alt="selected" />
+                </div>
+                <div className="space-y-1">
+                  <h2 className="text-2xl font-black text-slate-800">Confirm Cycle</h2>
+                  <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.3em]">Cempaka Premium Service</p>
+                </div>
+              <div className="space-y-5 px-2">
+                {[{ label: 'DEVICE', val: selectedMachine?.name }, { label: 'EST. TIME', val: selectedMachine?.type === MachineType.WASHER ? '35 MIN' : '45 MIN', color: 'text-blue-500' }].map((row, i) => (
+                  <div key={i} className="flex justify-between items-center border-b border-blue-100/50 pb-3.5">
+                    <span className="text-blue-300 font-black uppercase text-[8px] tracking-widest">{row.label}</span>
+                    <span className={`text-base font-black text-slate-700 ${row.color || ''}`}>{row.val}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={confirmBooking} className="w-full py-6 bg-blue-500 text-white rounded-[28px] font-black text-base tracking-widest active:scale-95 transition-all shadow-xl shadow-blue-200/50">START NOW</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {currentPage === 'SUCCESS' && (
+        <div className="flex flex-col h-full bg-white relative overflow-hidden items-center justify-center p-10 text-center">
+          <div className="w-28 h-28 bg-emerald-50 rounded-full flex items-center justify-center mb-10 shadow-inner border-4 border-white">
+            <svg className="w-14 h-14 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
+          </div>
+          <h2 className="text-3xl font-black text-slate-800 mb-3">Cycle Locked!</h2>
+          <p className="text-blue-400 font-black text-[10px] mb-12 uppercase tracking-[0.25em] leading-relaxed">Everything is set.<br/>We'll keep track of the time.</p>
+          <button onClick={() => setCurrentPage('TIMER_VIEW')} className="w-full py-6 bg-blue-500 text-white rounded-[28px] font-black tracking-widest text-sm active:scale-95">TRACK LIVE</button>
+        </div>
+      )}
+      {currentPage === 'TIMER_VIEW' && renderTimerView()}
+      {currentPage === 'THANK_YOU' && (
+        <div className="flex flex-col h-full bg-blue-500 items-center justify-center p-12 text-center text-white">
+          <div className="w-28 h-28 bg-white/20 rounded-full flex items-center justify-center mb-8 backdrop-blur-md">
+            <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
+          </div>
+          <h2 className="text-4xl font-black mb-5 tracking-tight">Cycle Finished!</h2>
+          <p className="text-blue-100 font-black text-[10px] mb-5 uppercase tracking-[0.4em] leading-loose">Your laundry is fresh & ready.<br/>Collect within 15 mins.</p>
+          <p className="text-white font-black text-lg mb-14 tracking-tight">Thank you for using Cempaka Laundry!</p>
+          <button onClick={() => setCurrentPage('HOME')} className="w-full py-6 bg-white text-blue-500 rounded-[30px] font-black text-base tracking-widest active:scale-95 transition-all">DASHBOARD</button>
+        </div>
+      )}
+      {currentPage === 'USER_GUIDE' && renderUserGuide()}
     </div>
   );
 };

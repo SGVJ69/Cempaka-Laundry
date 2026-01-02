@@ -1,4 +1,3 @@
-
 import { Machine, MachineStatus, MachineType } from './types';
 
 export const INITIAL_MACHINES: Machine[] = [
